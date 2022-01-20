@@ -14,34 +14,28 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-// Version 0.1.0
+// Version 0.2.0
 
 package crypgo
 
 import (
-	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 
+	"github.com/DataDog/zstd"
+	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/scrypt"
 )
 
-const hashSize = 32
+var format byte = 1
 
-const saltSize = 8
+const ivSize = chacha20poly1305.NonceSizeX
+const keySize = chacha20poly1305.KeySize
 
-const ivSize = 16
-
-const keySize = 32
-
+const scryptSaltSize = 8
 const scryptN = 1024
-
 const scryptR = 8
-
 const scryptP = 1
 
 func pwdToKey(salt []byte, password string) ([]byte, error) {
@@ -52,26 +46,60 @@ func pwdToKey(salt []byte, password string) ([]byte, error) {
 	return dk, nil
 }
 
-func encDec(iv []byte, key []byte, input []byte) ([]byte, error) {
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	ctr := cipher.NewCTR(c, iv)
-	out := make([]byte, len(input))
-	ctr.XORKeyStream(out, input)
-	return out, nil
-}
-
-func Hash(input []byte) []byte {
-	hash := sha256.Sum256(input)
-	return hash[:]
-}
-
 func genBytes(size int) []byte {
 	ret := make([]byte, size)
 	rand.Read(ret)
 	return ret
+}
+
+func Encode(password string, plainText string) (string, error) {
+	return encode(password, plainText, 0)
+}
+
+func CompressAndEncode(password string, plainText string, zLevel int) (string, error) {
+	if zLevel < 1 || zLevel > 19 {
+		return "", errors.New("zLevel must be between 1 and 19")
+	}
+	return encode(password, plainText, zLevel)
+}
+
+func encode(password string, plainText string, zLevel int) (string, error) {
+	header := []byte{format, 0}
+
+	iv := genBytes(ivSize)
+	salt := iv[:scryptSaltSize]
+
+	key, err := pwdToKey(salt, password)
+	if err != nil {
+		return "", err
+	}
+
+	plainBytes := []byte(plainText)
+
+	var zBytes []byte
+	if zLevel > 0 {
+		zBytes, err = zstd.CompressLevel(nil, plainBytes, 19)
+		if err != nil {
+			return "", err
+		}
+		if len(zBytes) < len(plainBytes) {
+			header[1] = 1
+		} else {
+			zBytes = plainBytes
+		}
+	} else {
+		zBytes = plainBytes
+	}
+
+	c, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		return "", err
+	}
+	cypherBytes := c.Seal(nil, iv, zBytes, header)
+
+	outBytes := append(header, append(iv, cypherBytes...)...)
+
+	return base64.StdEncoding.EncodeToString(outBytes), nil
 }
 
 func Decode(password string, base64CipherText string) (string, error) {
@@ -80,46 +108,37 @@ func Decode(password string, base64CipherText string) (string, error) {
 		return "", err
 	}
 
-	salt := inBytes[0:saltSize]
-	iv := inBytes[saltSize : saltSize+ivSize]
-	loadedHash := inBytes[saltSize+ivSize : saltSize+ivSize+hashSize]
-	cipherBytes := inBytes[saltSize+ivSize+hashSize:]
+	header := inBytes[:2]
+
+	if header[0] != format {
+		return "", errors.New("unknown format")
+	}
+
+	iv := inBytes[2 : ivSize+2]
+	salt := inBytes[2 : scryptSaltSize+2]
+	cypherBytes := inBytes[2+ivSize:]
 
 	key, err := pwdToKey(salt, password)
 	if err != nil {
 		return "", err
 	}
 
-	plainBytes, err := encDec(iv, key, cipherBytes)
+	c, err := chacha20poly1305.NewX(key)
 	if err != nil {
 		return "", err
 	}
+	plainBytes, err := c.Open(nil, iv, cypherBytes, header)
 
-	myHash := Hash(plainBytes)
+	if header[1] == 1 {
+		plainBytes, err = zstd.Decompress(nil, plainBytes)
+		if err != nil {
+			return "", err
+		}
+	}
 
-	if !bytes.Equal(loadedHash, myHash) {
-		return "", errors.New("wrong password or corrupted data")
+	if err != nil {
+		return "", err
 	}
 
 	return string(plainBytes), nil
-}
-
-func Encode(password string, plainText string) (string, error) {
-	salt := genBytes(saltSize)
-	iv := genBytes(ivSize)
-	key, err := pwdToKey(salt, password)
-	if err != nil {
-		return "", err
-	}
-
-	plainBytes := []byte(plainText)
-	cipherBytes, err := encDec(iv, key, plainBytes)
-	if err != nil {
-		return "", err
-	}
-
-	myHash := Hash(plainBytes)
-	outBytes := append(salt, append(iv, append(myHash, cipherBytes...)...)...)
-
-	return base64.StdEncoding.EncodeToString(outBytes), nil
 }
