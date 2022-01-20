@@ -14,19 +14,19 @@ Given a `password` and a `plaintext`, we want to encrypt and decrypt them:
 
 ```go
 password := "hello"
-	plaintext := "world"
+plaintext := "world"
 	
-	cyphertext, err := crypgo.Encode(password, plaintext)
-	if err != nil {
-		// ...
-	}
+cyphertext, err := crypgo.Encode(password, plaintext)
+if err != nil {
+	// ...
+}
 
-	plaintext2, err := crypgo.Decode(password, cyphertext)
-	if err != nil {
-		// ...
-	}
+plaintext2, err := crypgo.Decode(password, cyphertext)
+if err != nil {
+	// ...
+}
 
-	assert(plaintext == plaintext2)
+assert(plaintext == plaintext2)
 ```
 
 ## Notes
