@@ -1,13 +1,13 @@
 # crypgo
 
-A simple, very simple, dead simple Go library that encrypts/decrypts/compressesAndEncrypts strings to strings.
+A dead simple Go library that encrypts, decrypts, and optionally compresses strings to strings.
 
-Algorithm stack used:
+Algorithms used:
 
 - [Scrypt](https://en.wikipedia.org/wiki/Scrypt) to generate keys from passwords (N=1024, R=8, P=1);
 - [XChaCha20Poly1305](https://www.cryptopp.com/wiki/XChaCha20Poly1305) to encrypt and ensure integrity ([AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption));
 - [ZStd](https://en.wikipedia.org/wiki/Zstandard) to compress;
-- [Base64](https://en.wikipedia.org/wiki/Base64) to Encrypt bytes into string.
+- [Base64](https://en.wikipedia.org/wiki/Base64) to encode bytes into string.
 
 Compression is applied only if it reduces the size of the message.
 
@@ -42,4 +42,4 @@ The third argument for `CompressAndEncrypt` is the compression level for zstd, v
 
 ## Notes
 
-`cyphertext` will be base64, and includes a checksum, the various salt/IV (the same random bytes are used for scrypt's salt and for XChaCha nonce), and the encrypted/compressed plaintext, of course. Expect it to be longer than plaintext, if compression is not applied.
+`cyphertext` will be Base64-encoded, and includes a checksum, the random bytes for the salt and IV (the same random bytes are used for Scrypt's salt and for XChaCha's nonce), and the encrypted/compressed plaintext, of course. Expect it to be longer than the plaintext, if compression is not applied.
