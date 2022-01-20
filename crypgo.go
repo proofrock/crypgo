@@ -52,18 +52,18 @@ func genBytes(size int) []byte {
 	return ret
 }
 
-func Encode(password string, plainText string) (string, error) {
-	return encode(password, plainText, 0)
+func Encrypt(password string, plainText string) (string, error) {
+	return encrypt(password, plainText, 0)
 }
 
-func CompressAndEncode(password string, plainText string, zLevel int) (string, error) {
+func CompressAndEncrypt(password string, plainText string, zLevel int) (string, error) {
 	if zLevel < 1 || zLevel > 19 {
 		return "", errors.New("zLevel must be between 1 and 19")
 	}
-	return encode(password, plainText, zLevel)
+	return encrypt(password, plainText, zLevel)
 }
 
-func encode(password string, plainText string, zLevel int) (string, error) {
+func encrypt(password string, plainText string, zLevel int) (string, error) {
 	header := []byte{format, 0}
 
 	iv := genBytes(ivSize)
@@ -102,7 +102,7 @@ func encode(password string, plainText string, zLevel int) (string, error) {
 	return base64.StdEncoding.EncodeToString(outBytes), nil
 }
 
-func Decode(password string, base64CipherText string) (string, error) {
+func Decrypt(password string, base64CipherText string) (string, error) {
 	inBytes, err := base64.StdEncoding.DecodeString(base64CipherText)
 	if err != nil {
 		return "", err
