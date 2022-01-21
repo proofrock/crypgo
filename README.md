@@ -11,6 +11,10 @@ Algorithms used:
 
 Compression is applied only if it reduces the size of the message.
 
+## Documentation
+
+[pkg.go.dev](https://pkg.go.dev/github.com/proofrock/crypgo)
+
 ## Import
 
 ```
