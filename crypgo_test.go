@@ -28,6 +28,27 @@ func Test(t *testing.T) {
 	}
 }
 
+func TestUnicode(t *testing.T) {
+	password := "你好"
+	plaintext := "世界"
+
+	cyphertext, err := Encrypt(password, plaintext)
+	if err != nil {
+		t.Errorf("error in encoding: %v", err)
+		return
+	}
+
+	plaintext2, err := Decrypt(password, cyphertext)
+	if err != nil {
+		t.Errorf("error in decoding: %v", err)
+		return
+	}
+
+	if plaintext != plaintext2 {
+		t.Error("error in comparing results")
+	}
+}
+
 func load(url string) string {
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {

@@ -14,7 +14,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-// Version 0.2.1
+// Version 1.0.0
 
 package crypgo
 
@@ -52,10 +52,57 @@ func genBytes(size int) []byte {
 	return ret
 }
 
+// This function receives a password and a plain text (in string form) and produces a string
+// with their encryption. Returns it, or an eventual error, and closes all related resources.
+//
+// More in detail:
+//
+// - generates a key derived from the password, using SCrypt;
+//
+// - converts the plain text to a byte array;
+//
+// - encrypts the data with the key using XChaCha20-Poly1305, with an authentication tag.
+//
+// No compression is performed.
+//
+// The output string is the output data, Base64-encoded. It contains:
+//
+// - an header with the format version and information on whether data were encrypted or not;
+//
+// - an array of random bytes, used as the Salt for SCrypt and IV for XChaCha;
+//
+// - encrypted data;
+//
+// - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
 func Encrypt(password string, plainText string) (string, error) {
 	return encrypt(password, plainText, 0)
 }
 
+// This function receives a password and a plain text (in string form), and a level for
+// compression (from 1 to 19) and produces a string with their encryption, compressing the
+// plaintext if possible. Returns it, or an eventual error, and closes all related resources.
+//
+// More in detail:
+//
+// - generates a key derived from the password, using SCrypt;
+//
+// - converts the plain text to a byte array;
+//
+// - compresses this array using ZStd and the given compression level;
+//
+//   - if the data aren't compressible, keeps the uncompressed data;
+//
+// - encrypts the data with the key using XChaCha20-Poly1305, with an authentication tag.
+//
+// The output string is the output data, Base64-encoded. It contains:
+//
+// - an header with the format version and information on whether data were encrypted or not;
+//
+// - an array of random bytes, used as the Salt for SCrypt and IV for XChaCha;
+//
+// - encrypted data;
+//
+// - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
 func CompressAndEncrypt(password string, plainText string, zLevel int) (string, error) {
 	if zLevel < 1 || zLevel > 19 {
 		return "", errors.New("zLevel must be between 1 and 19")
@@ -102,6 +149,12 @@ func encrypt(password string, plainText string, zLevel int) (string, error) {
 	return base64.StdEncoding.EncodeToString(outBytes), nil
 }
 
+// This function receives a password and a cypher text (as produced by one of the Encrypt* methods)
+// and decodes the original plaintext (if the password is the one used for encryption).
+//
+// It will return it or an eventual error, and closes all related resources.
+// XChaCha20-Poly1305's authentication tag is used to detect any decryption error. It also
+// transparently decompress data, if needed.
 func Decrypt(password string, base64CipherText string) (string, error) {
 	inBytes, err := base64.StdEncoding.DecodeString(base64CipherText)
 	if err != nil {

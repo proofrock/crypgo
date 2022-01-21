@@ -4,9 +4,9 @@ A dead simple Go library that encrypts, decrypts, and optionally compresses stri
 
 Algorithms used:
 
-- [Scrypt](https://en.wikipedia.org/wiki/Scrypt) to generate keys from passwords (N=1024, R=8, P=1);
+- [SCrypt](https://en.wikipedia.org/wiki/Scrypt) to generate keys from passwords (N=1024, R=8, P=1);
 - [XChaCha20Poly1305](https://www.cryptopp.com/wiki/XChaCha20Poly1305) to encrypt and ensure integrity ([AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption));
-- [ZStd](https://en.wikipedia.org/wiki/Zstandard) to compress;
+- [ZStandard](https://en.wikipedia.org/wiki/Zstandard) to compress;
 - [Base64](https://en.wikipedia.org/wiki/Base64) to encode bytes into string.
 
 Compression is applied only if it reduces the size of the message.
