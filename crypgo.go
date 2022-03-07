@@ -28,7 +28,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-var format byte = 1
+const format byte = 1
 
 const ivSize = chacha20poly1305.NonceSizeX
 const keySize = chacha20poly1305.KeySize
@@ -37,6 +37,12 @@ const scryptSaltSize = 8
 const scryptN = 1024
 const scryptR = 8
 const scryptP = 1
+
+var base64Variant = base64.StdEncoding
+
+func SetVariant(variant *base64.Encoding) {
+	base64Variant = variant
+}
 
 func pwdToKey(salt []byte, password string) ([]byte, error) {
 	dk, err := scrypt.Key([]byte(password), salt, scryptN, scryptR, scryptP, keySize)
@@ -146,7 +152,7 @@ func encrypt(password string, plainText string, zLevel int) (string, error) {
 
 	outBytes := append(header, append(iv, cypherBytes...)...)
 
-	return base64.StdEncoding.EncodeToString(outBytes), nil
+	return base64Variant.EncodeToString(outBytes), nil
 }
 
 // This function receives a password and a cypher text (as produced by one of the Encrypt* methods)
@@ -156,7 +162,7 @@ func encrypt(password string, plainText string, zLevel int) (string, error) {
 // XChaCha20-Poly1305's authentication tag is used to detect any decryption error. It also
 // transparently decompress data, if needed.
 func Decrypt(password string, base64CipherText string) (string, error) {
-	inBytes, err := base64.StdEncoding.DecodeString(base64CipherText)
+	inBytes, err := base64Variant.DecodeString(base64CipherText)
 	if err != nil {
 		return "", err
 	}
@@ -290,7 +296,7 @@ func encryptBytes(password string, plainText []byte, zLevel int) (string, error)
 
 	outBytes := append(header, append(iv, cypherBytes...)...)
 
-	return base64.StdEncoding.EncodeToString(outBytes), nil
+	return base64Variant.EncodeToString(outBytes), nil
 }
 
 // This function receives a password and a cypher text (as produced by one of the Encrypt* methods)
@@ -300,7 +306,7 @@ func encryptBytes(password string, plainText []byte, zLevel int) (string, error)
 // XChaCha20-Poly1305's authentication tag is used to detect any decryption error. It also
 // transparently decompress data, if needed.
 func DecryptBytes(password string, base64CipherText string) ([]byte, error) {
-	inBytes, err := base64.StdEncoding.DecodeString(base64CipherText)
+	inBytes, err := base64Variant.DecodeString(base64CipherText)
 	if err != nil {
 		return make([]byte, 0), err
 	}
