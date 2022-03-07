@@ -1,8 +1,10 @@
 package crypgo
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"testing"
 )
@@ -90,6 +92,34 @@ func TestLongString(t *testing.T) {
 	}
 
 	if prufrock != plaintext2 {
+		t.Error("error in comparing results")
+	}
+}
+
+func TestBytes(t *testing.T) {
+	prufrock := make([]byte, 5000)
+	_, err := rand.Read(prufrock)
+	if err != nil {
+		t.Errorf("error in collecting rnd: %v", err)
+		return
+	}
+
+	password := "1234567890"
+	cyphertext, err := EncryptBytes(password, prufrock)
+	if err != nil {
+		t.Errorf("error in encoding: %v", err)
+		return
+	}
+
+	fmt.Printf("%d -> %d\n", len(prufrock), len(cyphertext))
+
+	plaintext2, err := DecryptBytes(password, cyphertext)
+	if err != nil {
+		t.Errorf("error in decoding: %v", err)
+		return
+	}
+
+	if !bytes.Equal(prufrock, plaintext2) {
 		t.Error("error in comparing results")
 	}
 }

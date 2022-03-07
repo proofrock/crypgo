@@ -195,3 +195,147 @@ func Decrypt(password string, base64CipherText string) (string, error) {
 
 	return string(plainBytes), nil
 }
+
+// This function receives a password and a plain text (in string form) and produces a string
+// with their encryption. Returns it, or an eventual error, and closes all related resources.
+//
+// More in detail:
+//
+// - generates a key derived from the password, using SCrypt;
+//
+// - converts the plain text to a byte array;
+//
+// - encrypts the data with the key using XChaCha20-Poly1305, with an authentication tag.
+//
+// No compression is performed.
+//
+// The output string is the output data, Base64-encoded. It contains:
+//
+// - an header with the format version and information on whether data were encrypted or not;
+//
+// - an array of random bytes, used as the Salt for SCrypt and IV for XChaCha;
+//
+// - encrypted data;
+//
+// - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
+func EncryptBytes(password string, plainText []byte) (string, error) {
+	return encryptBytes(password, plainText, 0)
+}
+
+// This function receives a password and a plain text (in string form), and a level for
+// compression (from 1 to 19) and produces a string with their encryption, compressing the
+// plaintext if possible. Returns it, or an eventual error, and closes all related resources.
+//
+// More in detail:
+//
+// - generates a key derived from the password, using SCrypt;
+//
+// - converts the plain text to a byte array;
+//
+// - compresses this array using ZStd and the given compression level;
+//
+//   - if the data aren't compressible, keeps the uncompressed data;
+//
+// - encrypts the data with the key using XChaCha20-Poly1305, with an authentication tag.
+//
+// The output string is the output data, Base64-encoded. It contains:
+//
+// - an header with the format version and information on whether data were encrypted or not;
+//
+// - an array of random bytes, used as the Salt for SCrypt and IV for XChaCha;
+//
+// - encrypted data;
+//
+// - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
+func CompressAndEncryptBytes(password string, plainText []byte, zLevel int) (string, error) {
+	if zLevel < 1 || zLevel > 19 {
+		return "", errors.New("zLevel must be between 1 and 19")
+	}
+	return encryptBytes(password, plainText, zLevel)
+}
+
+func encryptBytes(password string, plainText []byte, zLevel int) (string, error) {
+	header := []byte{format, 0}
+
+	iv := genBytes(ivSize)
+	salt := iv[:scryptSaltSize]
+
+	key, err := pwdToKey(salt, password)
+	if err != nil {
+		return "", err
+	}
+
+	plainBytes := []byte(plainText)
+
+	var zBytes []byte
+	if zLevel > 0 {
+		zBytes, err = zstd.CompressLevel(nil, plainBytes, 19)
+		if err != nil {
+			return "", err
+		}
+		if len(zBytes) < len(plainBytes) {
+			header[1] = 1
+		} else {
+			zBytes = plainBytes
+		}
+	} else {
+		zBytes = plainBytes
+	}
+
+	c, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		return "", err
+	}
+	cypherBytes := c.Seal(nil, iv, zBytes, header)
+
+	outBytes := append(header, append(iv, cypherBytes...)...)
+
+	return base64.StdEncoding.EncodeToString(outBytes), nil
+}
+
+// This function receives a password and a cypher text (as produced by one of the Encrypt* methods)
+// and decodes the original plaintext (if the password is the one used for encryption).
+//
+// It will return it or an eventual error, and closes all related resources.
+// XChaCha20-Poly1305's authentication tag is used to detect any decryption error. It also
+// transparently decompress data, if needed.
+func DecryptBytes(password string, base64CipherText string) ([]byte, error) {
+	inBytes, err := base64.StdEncoding.DecodeString(base64CipherText)
+	if err != nil {
+		return make([]byte, 0), err
+	}
+
+	header := inBytes[:2]
+
+	if header[0] != format {
+		return make([]byte, 0), errors.New("unknown format")
+	}
+
+	iv := inBytes[2 : ivSize+2]
+	salt := inBytes[2 : scryptSaltSize+2]
+	cypherBytes := inBytes[2+ivSize:]
+
+	key, err := pwdToKey(salt, password)
+	if err != nil {
+		return make([]byte, 0), err
+	}
+
+	c, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		return make([]byte, 0), err
+	}
+	plainBytes, err := c.Open(nil, iv, cypherBytes, header)
+
+	if header[1] == 1 {
+		plainBytes, err = zstd.Decompress(nil, plainBytes)
+		if err != nil {
+			return make([]byte, 0), err
+		}
+	}
+
+	if err != nil {
+		return make([]byte, 0), err
+	}
+
+	return plainBytes, nil
+}
