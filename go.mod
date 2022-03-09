@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/DataDog/zstd v1.5.0
-	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
+	golang.org/x/crypto v0.0.0-20220307211146-efcb8507fb70
 )
 
-require golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
+require golang.org/x/sys v0.0.0-20220307203707-22a9840ba4d7 // indirect
