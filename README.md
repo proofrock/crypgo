@@ -44,6 +44,20 @@ assert(plaintext == plaintext2)
 ```
 The third argument for `CompressAndEncrypt` is the compression level for zstd, values are 1 to 19 (inclusive).
 
+### Byte mode
+
+Each method also has a byte variant (same name, suffixed by `Bytes`) where the plaintext is a byte array instead of a
+string.
+
+### Different Base64 encodings
+
+The method `SetVariant` allows to setup a Base64 variant, as defined by Go. For example, to use a URL-safe Base64 encoding, just for the method, code can be:
+
+```go
+SetVariant(base64.URLEncoding)
+defer SetVariant(base64.StdEncoding)
+```
+
 ## Notes
 
 `cyphertext` will be Base64-encoded, and includes a checksum, the random bytes for the salt and IV (the same random bytes are used for Scrypt's salt and for XChaCha's nonce), and the encrypted/compressed plaintext, of course. Expect it to be longer than the plaintext, if compression is not applied.

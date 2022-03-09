@@ -40,6 +40,8 @@ const scryptP = 1
 
 var base64Variant = base64.StdEncoding
 
+// Sets a Base64 variant, for example base64.URLEncoding for
+// URL_safe encoding.
 func SetVariant(variant *base64.Encoding) {
 	base64Variant = variant
 }
