@@ -1,8 +1,11 @@
 package crypgo
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"testing"
 )
@@ -77,6 +80,60 @@ func TestLongString(t *testing.T) {
 	}
 
 	fmt.Printf("%d -> %d\n", len(prufrock), len(cyphertext))
+
+	plaintext2, err := Decrypt(password, cyphertext)
+	if err != nil {
+		t.Errorf("error in decoding: %v", err)
+		return
+	}
+
+	if len(cyphertext) > len(prufrock) {
+		t.Error("length should be decreasing")
+		return
+	}
+
+	if prufrock != plaintext2 {
+		t.Error("error in comparing results")
+	}
+}
+
+func TestBytes(t *testing.T) {
+	prufrock := make([]byte, 5000)
+	_, err := rand.Read(prufrock)
+	if err != nil {
+		t.Errorf("error in collecting rnd: %v", err)
+		return
+	}
+
+	password := "1234567890"
+	cyphertext, err := EncryptBytes(password, prufrock)
+	if err != nil {
+		t.Errorf("error in encoding: %v", err)
+		return
+	}
+
+	plaintext2, err := DecryptBytes(password, cyphertext)
+	if err != nil {
+		t.Errorf("error in decoding: %v", err)
+		return
+	}
+
+	if !bytes.Equal(prufrock, plaintext2) {
+		t.Error("error in comparing results")
+	}
+}
+
+func TestAltBase64(t *testing.T) {
+	SetVariant(base64.URLEncoding)
+	defer SetVariant(base64.StdEncoding)
+
+	prufrock := load("https://www.gutenberg.org/cache/epub/1459/pg1459.txt")
+	password := "1234567890"
+	cyphertext, err := CompressAndEncrypt(password, prufrock, 19)
+	if err != nil {
+		t.Errorf("error in encoding: %v", err)
+		return
+	}
 
 	plaintext2, err := Decrypt(password, cyphertext)
 	if err != nil {

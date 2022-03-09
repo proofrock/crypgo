@@ -14,7 +14,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-// Version 1.0.0
+// Version 1.1.0
 
 package crypgo
 
@@ -28,7 +28,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-var format byte = 1
+const format byte = 1
 
 const ivSize = chacha20poly1305.NonceSizeX
 const keySize = chacha20poly1305.KeySize
@@ -37,6 +37,14 @@ const scryptSaltSize = 8
 const scryptN = 1024
 const scryptR = 8
 const scryptP = 1
+
+var base64Variant = base64.StdEncoding
+
+// Sets a Base64 variant, for example base64.URLEncoding for
+// URL_safe encoding.
+func SetVariant(variant *base64.Encoding) {
+	base64Variant = variant
+}
 
 func pwdToKey(salt []byte, password string) ([]byte, error) {
 	dk, err := scrypt.Key([]byte(password), salt, scryptN, scryptR, scryptP, keySize)
@@ -75,7 +83,7 @@ func genBytes(size int) []byte {
 //
 // - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
 func Encrypt(password string, plainText string) (string, error) {
-	return encrypt(password, plainText, 0)
+	return encryptBytes(password, []byte(plainText), 0)
 }
 
 // This function receives a password and a plain text (in string form), and a level for
@@ -107,10 +115,78 @@ func CompressAndEncrypt(password string, plainText string, zLevel int) (string, 
 	if zLevel < 1 || zLevel > 19 {
 		return "", errors.New("zLevel must be between 1 and 19")
 	}
-	return encrypt(password, plainText, zLevel)
+	return encryptBytes(password, []byte(plainText), zLevel)
 }
 
-func encrypt(password string, plainText string, zLevel int) (string, error) {
+// This function receives a password and a cypher text (as produced by one of the Encrypt* methods)
+// and decodes the original plaintext (if the password is the one used for encryption).
+//
+// It will return it or an eventual error, and closes all related resources.
+// XChaCha20-Poly1305's authentication tag is used to detect any decryption error. It also
+// transparently decompress data, if needed.
+func Decrypt(password string, base64CipherText string) (string, error) {
+	b, err := DecryptBytes(password, base64CipherText)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// This function receives a password and a a byte array and produces a string
+// with their encryption. Returns it, or an eventual error, and closes all related resources.
+//
+// More in detail:
+//
+// - generates a key derived from the password, using SCrypt;
+//
+// - encrypts the data with the key using XChaCha20-Poly1305, with an authentication tag.
+//
+// No compression is performed.
+//
+// The output string is the output data, Base64-encoded. It contains:
+//
+// - an header with the format version and information on whether data were encrypted or not;
+//
+// - an array of random bytes, used as the Salt for SCrypt and IV for XChaCha;
+//
+// - encrypted data;
+//
+// - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
+func EncryptBytes(password string, plainText []byte) (string, error) {
+	return encryptBytes(password, plainText, 0)
+}
+
+// This function receives a password, a byte array, and a level for
+// compression (from 1 to 19) and produces a string with their encryption, compressing the
+// byte array if possible. Returns it, or an eventual error, and closes all related resources.
+//
+// More in detail:
+//
+// - generates a key derived from the password, using SCrypt;
+//
+// - compresses the byte array using ZStd and the given compression level;
+//
+//   - if the data aren't compressible, keeps the uncompressed data;
+//
+// - encrypts the data with the key using XChaCha20-Poly1305, with an authentication tag.
+//
+// The output string is the output data, Base64-encoded. It contains:
+//
+// - an header with the format version and information on whether data were encrypted or not;
+//
+// - an array of random bytes, used as the Salt for SCrypt and IV for XChaCha;
+//
+// - encrypted data;
+//
+// - an authentication tag, part of the output of XChaCha20-Poly1305, used to verify the integrity when decrypting.
+func CompressAndEncryptBytes(password string, plainText []byte, zLevel int) (string, error) {
+	if zLevel < 1 || zLevel > 19 {
+		return "", errors.New("zLevel must be between 1 and 19")
+	}
+	return encryptBytes(password, plainText, zLevel)
+}
+
+func encryptBytes(password string, plainText []byte, zLevel int) (string, error) {
 	header := []byte{format, 0}
 
 	iv := genBytes(ivSize)
@@ -146,25 +222,25 @@ func encrypt(password string, plainText string, zLevel int) (string, error) {
 
 	outBytes := append(header, append(iv, cypherBytes...)...)
 
-	return base64.StdEncoding.EncodeToString(outBytes), nil
+	return base64Variant.EncodeToString(outBytes), nil
 }
 
-// This function receives a password and a cypher text (as produced by one of the Encrypt* methods)
+// This function receives a password and a cypher text (as produced by one of the *EncryptBytes methods)
 // and decodes the original plaintext (if the password is the one used for encryption).
 //
 // It will return it or an eventual error, and closes all related resources.
 // XChaCha20-Poly1305's authentication tag is used to detect any decryption error. It also
 // transparently decompress data, if needed.
-func Decrypt(password string, base64CipherText string) (string, error) {
-	inBytes, err := base64.StdEncoding.DecodeString(base64CipherText)
+func DecryptBytes(password string, base64CipherText string) ([]byte, error) {
+	inBytes, err := base64Variant.DecodeString(base64CipherText)
 	if err != nil {
-		return "", err
+		return make([]byte, 0), err
 	}
 
 	header := inBytes[:2]
 
 	if header[0] != format {
-		return "", errors.New("unknown format")
+		return make([]byte, 0), errors.New("unknown format")
 	}
 
 	iv := inBytes[2 : ivSize+2]
@@ -173,25 +249,25 @@ func Decrypt(password string, base64CipherText string) (string, error) {
 
 	key, err := pwdToKey(salt, password)
 	if err != nil {
-		return "", err
+		return make([]byte, 0), err
 	}
 
 	c, err := chacha20poly1305.NewX(key)
 	if err != nil {
-		return "", err
+		return make([]byte, 0), err
 	}
 	plainBytes, err := c.Open(nil, iv, cypherBytes, header)
 
 	if header[1] == 1 {
 		plainBytes, err = zstd.Decompress(nil, plainBytes)
 		if err != nil {
-			return "", err
+			return make([]byte, 0), err
 		}
 	}
 
 	if err != nil {
-		return "", err
+		return make([]byte, 0), err
 	}
 
-	return string(plainBytes), nil
+	return plainBytes, nil
 }
