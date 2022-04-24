@@ -3,7 +3,7 @@ module github.com/proofrock/crypgo
 go 1.18
 
 require (
-	github.com/DataDog/zstd v1.5.2
+	github.com/klauspost/compress v1.15.1
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 )
 
