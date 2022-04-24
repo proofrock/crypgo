@@ -14,7 +14,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-// Version 1.1.0
+// Version 1.2.0
 
 package crypgo
 
