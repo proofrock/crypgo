@@ -1,4 +1,4 @@
-# crypgo
+# crypgo 1.2.0
 
 A dead simple Go library that encrypts, decrypts, and optionally compresses strings to strings.
 
@@ -61,3 +61,11 @@ defer SetVariant(base64.StdEncoding)
 ## Notes
 
 `cyphertext` will be Base64-encoded, and includes a checksum, the random bytes for the salt and IV (the same random bytes are used for Scrypt's salt and for XChaCha's nonce), and the encrypted/compressed plaintext, of course. Expect it to be longer than the plaintext, if compression is not applied.
+
+## Changelog
+
+#### v1.2.0
+
+- migration to klauspost/compress, which doesn't require CGO
+- added more tests
+
