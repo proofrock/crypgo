@@ -14,7 +14,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-// Version 1.1.0
+// Version 1.2.0
 
 package crypgo
 
@@ -22,8 +22,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"github.com/klauspost/compress/zstd"
 
-	"github.com/DataDog/zstd"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/scrypt"
 )
@@ -56,7 +56,7 @@ func pwdToKey(salt []byte, password string) ([]byte, error) {
 
 func genBytes(size int) []byte {
 	ret := make([]byte, size)
-	rand.Read(ret)
+	_, _ = rand.Read(ret)
 	return ret
 }
 
@@ -186,7 +186,20 @@ func CompressAndEncryptBytes(password string, plainText []byte, zLevel int) (str
 	return encryptBytes(password, plainText, zLevel)
 }
 
-func encryptBytes(password string, plainText []byte, zLevel int) (string, error) {
+func zstdLvl2kpLvl(zstdLvl int) zstd.EncoderLevel {
+	if zstdLvl < 3 {
+		return zstd.SpeedFastest
+	}
+	if zstdLvl < 7 {
+		return zstd.SpeedDefault
+	}
+	if zstdLvl < 11 {
+		return zstd.SpeedBetterCompression
+	}
+	return zstd.SpeedBestCompression
+}
+
+func encryptBytes(password string, plainBytes []byte, zLevel int) (string, error) {
 	header := []byte{format, 0}
 
 	iv := genBytes(ivSize)
@@ -197,14 +210,12 @@ func encryptBytes(password string, plainText []byte, zLevel int) (string, error)
 		return "", err
 	}
 
-	plainBytes := []byte(plainText)
-
 	var zBytes []byte
 	if zLevel > 0 {
-		zBytes, err = zstd.CompressLevel(nil, plainBytes, 19)
-		if err != nil {
-			return "", err
-		}
+		klauspostLevel := zstdLvl2kpLvl(zLevel)
+
+		var encoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.EncoderLevel(klauspostLevel)))
+		zBytes = encoder.EncodeAll(plainBytes, make([]byte, 0, len(plainBytes)))
 		if len(zBytes) < len(plainBytes) {
 			header[1] = 1
 		} else {
@@ -224,6 +235,8 @@ func encryptBytes(password string, plainText []byte, zLevel int) (string, error)
 
 	return base64Variant.EncodeToString(outBytes), nil
 }
+
+var decoder, _ = zstd.NewReader(nil)
 
 // This function receives a password and a cypher text (as produced by one of the *EncryptBytes methods)
 // and decodes the original plaintext (if the password is the one used for encryption).
@@ -259,7 +272,7 @@ func DecryptBytes(password string, base64CipherText string) ([]byte, error) {
 	plainBytes, err := c.Open(nil, iv, cypherBytes, header)
 
 	if header[1] == 1 {
-		plainBytes, err = zstd.Decompress(nil, plainBytes)
+		plainBytes, err = decoder.DecodeAll(plainBytes, nil)
 		if err != nil {
 			return make([]byte, 0), err
 		}

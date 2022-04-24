@@ -150,3 +150,48 @@ func TestAltBase64(t *testing.T) {
 		t.Error("error in comparing results")
 	}
 }
+
+func TestCompression(t *testing.T) {
+	prufrock := make([]byte, 5000)
+	_, err := rand.Read(prufrock)
+	if err != nil {
+		t.Errorf("error in collecting rnd: %v", err)
+		return
+	}
+
+	for lvl := 1; lvl <= 19; lvl++ {
+		password := "1234567890"
+		cyphertext, err := CompressAndEncryptBytes(password, prufrock, lvl)
+		if err != nil {
+			t.Errorf("error in encoding: %v", err)
+			return
+		}
+
+		plaintext2, err := DecryptBytes(password, cyphertext)
+		if err != nil {
+			t.Errorf("error in decoding: %v", err)
+			return
+		}
+
+		if !bytes.Equal(prufrock, plaintext2) {
+			t.Error("error in comparing results")
+		}
+	}
+}
+
+// test just decompression, to test regressions when switching libs
+func TestFixedDecompression(t *testing.T) {
+	str := "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+	cyph := "AQGz4+KJeOgLKeMRESeZcRiAB4RGO7p4gN3Bf9zVkKqZUsLZM69jaU3EAN7q+jnCpHhmYCnD1N3I4A=="
+	password := "1234567890"
+
+	plaintext2, err := Decrypt(password, cyph)
+	if err != nil {
+		t.Errorf("error in decoding: %v", err)
+		return
+	}
+
+	if str != plaintext2 {
+		t.Error("error in comparing results")
+	}
+}
