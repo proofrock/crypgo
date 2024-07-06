@@ -1,3 +1,4 @@
+> Archived, as it's not used in `ws4sqlite` anymore and I don't plan to maintain it. OTOH it doesn't have glaring defects that I can see, apart (and it's big) that it's never a good idea to duplicate effort.
 # crypgo 1.2.0
 
 A dead simple Go library that encrypts, decrypts, and optionally compresses strings to strings.
